@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>My Book Reader</title>
+  <!-- CSS: change the colors and layout in this section. -->
+  <style>
+    :root { --accent:#146b60; --ink:#233331; --muted:#64706b; --bg:#eeeee7; --line:#d9ddd4; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+    button,input,select { font:inherit; }
+    button,select { cursor:pointer; }
+    button:disabled { cursor:default; opacity:.4; }
+    button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid #74b6ab; outline-offset:3px; }
+    header { background:#fafbf6; border-bottom:1px solid var(--line); padding:20px clamp(18px,4vw,60px); display:flex; align-items:center; justify-content:space-between; gap:18px; }
+    .brand { display:flex; align-items:center; gap:13px; }
+    .logo { width:40px; height:40px; display:grid; place-items:center; border-radius:12px; background:var(--accent); color:white; }
+    .eyebrow { font-size:10px; letter-spacing:2px; text-transform:uppercase; margin:0 0 4px; color:var(--muted); font-weight:650; }
+    h1 { font-size:19px; margin:0; font-weight:650; letter-spacing:-.5px; }
+    .actions { display:flex; gap:8px; align-items:center; }
+    .button { border:1px solid var(--line); padding:10px 14px; background:#fff; color:var(--ink); border-radius:8px; font-size:13px; font-weight:550; }
+    .button.primary { background:var(--accent); color:white; border-color:var(--accent); }
+    #pdfFile { display:none; }
+    main { max-width:1500px; margin:auto; padding:22px 24px 12px; }
+    .book-meta { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 auto 16px; max-width:1120px; }
+    #bookName { margin:0; font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #sourceTag { white-space:nowrap; font-size:10px; letter-spacing:1.4px; text-transform:uppercase; color:var(--accent); padding:6px 9px; border:1px solid #bfd2c7; border-radius:20px; }
+    #stage { min-height:300px; padding:8px 20px 24px; overflow:auto; }
+    #pages { display:flex; gap:2px; align-items:flex-start; justify-content:center; width:max-content; min-width:100%; margin:auto; }
+    .paper { padding:0; border:0; display:block; position:relative; flex:none; background:#fff; box-shadow:0 10px 22px #20362b1a,0 1px 3px #20362b22; }
+    .paper canvas { display:block; }
+    #pages.spread .paper:first-child::after { content:""; position:absolute; right:0; top:0; bottom:0; width:24px; background:linear-gradient(90deg,transparent,#17271e18); pointer-events:none; }
+    #pages.spread .paper:last-child::after { content:""; position:absolute; left:0; top:0; bottom:0; width:20px; background:linear-gradient(90deg,#17271e13,transparent); pointer-events:none; }
+    .toolbar { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px; background:#fafbf6; border:1px solid var(--line); border-radius:12px; padding:12px 16px; max-width:830px; margin:2px auto 0; box-shadow:0 4px 16px #20362b06; }
+    .group { display:flex; align-items:center; gap:8px; }
+    .divider { width:1px; height:26px; background:var(--line); }
+    .icon-button { width:36px; height:34px; padding:0; border:1px solid var(--line); background:white; border-radius:7px; color:var(--ink); font-size:20px; }
+    .small { font-size:12px; color:var(--muted); }
+    #pageInput { width:62px; height:34px; border:1px solid var(--line); border-radius:6px; text-align:center; background:white; color:var(--ink); }
+    #pageTotal { min-width:32px; font-size:12px; color:var(--muted); }
+    #zoomLabel { width:42px; text-align:center; font-size:12px; }
+    #layout { height:34px; max-width:135px; background:white; border:1px solid var(--line); border-radius:6px; padding:0 7px; color:var(--ink); font-size:12px; }
+    #status { min-height:20px; text-align:center; margin:14px auto 0; font-size:12px; color:var(--muted); line-height:1.6; max-width:850px; }
+    #status.error { color:#9b342d; }
+    .footnote { font-size:11px; color:var(--muted); text-align:center; line-height:1.7; margin:8px auto 18px; max-width:830px; }
+    .footnote span { display:block; }
+    noscript { display:block; padding:25px; }
+    @media (max-width:680px) {
+      header { padding:16px; align-items:flex-start; }
+      h1 { font-size:16px; }
+      .eyebrow { font-size:9px; letter-spacing:1.4px; }
+      .logo { display:none; }
+      .actions { gap:5px; }
+      .button { padding:9px; font-size:11px; }
+      main { padding:18px 8px 8px; }
+      .book-meta { padding:0 8px; }
+      #stage { padding:6px 4px 18px; min-height:250px; }
+      .toolbar { gap:9px; padding:10px 8px; }
+      .divider { display:none; }
+      #sourceTag { font-size:9px; }
+    }
+    @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; } }
+  </style>
+</head>
+<body>
+  <!-- HTML: the visible buttons, labels, and page container. -->
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1Z"/><path d="M12 6v14"/></svg>
+      </div>
+      <div><p class="eyebrow">Your reading room</p><h1>My Book Reader</h1></div>
+    </div>
+    <div class="actions">
+      <button id="demoButton" class="button" type="button">Try demo</button>
+      <button id="openButton" class="button primary" type="button">Open a PDF</button>
+      <input id="pdfFile" type="file" accept="application/pdf,.pdf" aria-label="Choose a PDF from this device">
+    </div>
+  </header>
+  <main>
+    <div class="book-meta"><h2 id="bookName">A little guide to your reader</h2><span id="sourceTag">Demo book</span></div>
+    <div id="stage" aria-label="Book pages"><div id="pages"></div></div>
+    <nav class="toolbar" aria-label="Reading controls">
+      <div class="group">
+        <button id="previous" class="icon-button" type="button" aria-label="Previous page or spread" title="Previous (left arrow)">&larr;</button>
+        <form id="jumpForm" class="group">
+          <label class="small" for="pageInput">Page</label>
+          <input id="pageInput" type="number" min="1" max="6" value="1" step="1" inputmode="numeric">
+          <span id="pageTotal">/ 6</span>
+          <button class="button" id="goButton" type="submit" style="padding:7px 9px">Go</button>
+        </form>
+        <button id="next" class="icon-button" type="button" aria-label="Next page or spread" title="Next (right arrow)">&rarr;</button>
+      </div>
+      <span class="divider" aria-hidden="true"></span>
+      <div class="group">
+        <button id="zoomOut" class="icon-button" type="button" aria-label="Zoom out">&minus;</button>
+        <span id="zoomLabel">100%</span>
+        <button id="zoomIn" class="icon-button" type="button" aria-label="Zoom in">+</button>
+        <button id="fit" class="button" type="button" style="padding:7px 10px">Fit</button>
+      </div>
+      <span class="divider" aria-hidden="true"></span>
+      <select id="layout" aria-label="Page layout"><option value="spread">Book spread</option><option value="single">One page</option></select>
+    </nav>
+    <p id="status" role="status" aria-live="polite">Opening the demo...</p>
+    <p class="footnote">Click the left or right side to turn. Arrow keys work, too.
+      <span>Chosen PDFs are not uploaded. The PDF library loads online; only your page position is saved in this browser.</span>
+    </p>
+    <noscript>Enable JavaScript to use this reader.</noscript>
+  </main>
+  <!-- JAVASCRIPT: loads a PDF and controls which pages are shown. -->
+  <script type="module">
+    // OPTIONAL: leave this blank for a local-file reader.
+    // To publish an AUTHORIZED PDF, put it next to index.html and use "./book.pdf".
+    // Do not publish copyrighted textbook scans without the necessary rights.
+    const PUBLIC_PDF_URL = "";
+    const PDFJS_VERSION = "6.3.289";
+
+    const $ = (id) => document.getElementById(id);
+    const state = { pdf:null, count:6, page:1, zoom:1, layout:"spread", busy:false, key:"" };
+    let renderVersion = 0;
+    let activeTasks = new Set();
+    let enginePromise = null;
+    let resizeTimer;
+
+    function tell(message, error=false) {
+      $("status").textContent = message;
+      $("status").classList.toggle("error", error);
+    }
+    function twoPages() { return state.layout === "spread" && window.innerWidth > 680; }
+    function startPage() {
+      return twoPages() && state.page > 1 ? state.page - state.page % 2 : state.page;
+    }
+    function visiblePages() {
+      const first = startPage();
+      return twoPages() && first > 1 && first < state.count ? [first, first+1] : [first];
+    }
+    function cancelRenders() {
+      renderVersion++;
+      for (const task of activeTasks) task.cancel();
+      activeTasks.clear();
+    }
+    function updateControls() {
+      const first = startPage();
+      $("previous").disabled = state.busy || first <= 1;
+      $("next").disabled = state.busy || visiblePages().at(-1) >= state.count;
+      for (const id of ["openButton","demoButton","goButton","pageInput","layout","fit"]) $(id).disabled = state.busy;
+      $("zoomOut").disabled = state.busy || state.zoom <= .75;
+      $("zoomIn").disabled = state.busy || state.zoom >= 2;
+      $("pageInput").value = state.page;
+      $("pageInput").max = state.count;
+      $("pageTotal").textContent = `/ ${state.count}`;
+      $("zoomLabel").textContent = `${Math.round(state.zoom*100)}%`;
+    }
+    function rememberPage() {
+      if (!state.key) return;
+      try { localStorage.setItem(state.key, String(state.page)); } catch { /* Storage can be blocked. */ }
+    }
+    function rememberedPage(key, count) {
+      try {
+        const n = Number(localStorage.getItem(key));
+        return Number.isInteger(n) && n >= 1 && n <= count ? n : 1;
+      } catch { return 1; }
+    }
+    function goTo(page) {
+      if (state.busy || !Number.isFinite(page)) return;
+      state.page = Math.max(1, Math.min(state.count, Math.trunc(page)));
+      rememberPage();
+      render();
+    }
+    // These two functions make the book move backward or forward.
+    function turn(direction) {
+      const first = startPage();
+      if (!twoPages()) return goTo(first + direction);
+      if (direction > 0) {
+        if (visiblePages().at(-1) >= state.count) return;
+        goTo(first === 1 ? 2 : first + 2);
+      } else {
+        goTo(first <= 2 ? 1 : first - 2);
+      }
+    }
+    function wrapText(ctx, text, x, y, width, lineHeight) {
+      let line = "";
+      for (const word of text.split(" ")) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (line && ctx.measureText(candidate).width > width) {
+          ctx.fillText(line,x,y); y += lineHeight; line = word;
+        } else line = candidate;
+      }
+      if (line) ctx.fillText(line,x,y);
+      return y + lineHeight;
+    }
+    // Original demo content: no textbook material, and no internet required.
+    function drawDemo(ctx, number, width, height) {
+      ctx.save(); ctx.scale(width/600, height/820);
+      ctx.fillStyle = "#fffef7"; ctx.fillRect(0,0,600,820);
+      ctx.fillStyle = "#146b60"; ctx.fillRect(55,58,40,4);
+      ctx.font = "12px sans-serif"; ctx.fillText("THE READING ROOM  /  START HERE",55,93);
+      const titles = ["A little guide\nto your reader.","Make yourself\nat home.","Your PDF.\nYour device.","Make the code\nyour own.","A website\nyou can share.","Your next\nchapter."];
+      ctx.fillStyle = "#233331"; ctx.font = "46px Georgia, serif";
+      titles[number-1].split("\n").forEach((line,i) => ctx.fillText(line,55,185+i*56));
+      const body = [
+        "A small place for big books. Open a PDF, find your page, and keep reading without a wall of tabs.",
+        "Click the right-hand page to move forward. Click the left-hand page to go back. You can also use the arrow buttons or your keyboard.",
+        "Open a PDF from your computer using the button above. The reader processes that file in your browser, not on an upload server.",
+        "HTML creates the buttons and page area. CSS controls the colors and spacing. JavaScript decides which pages appear when you click.",
+        "The reader itself can be a public website. A shared book needs its own permission: owning a printed copy does not grant publishing rights.",
+        "Start with a small test PDF. Check the page order and text quality before preparing a much larger book. Your reader is ready for a first test."
+      ];
+      ctx.font = "19px Georgia, serif"; ctx.fillStyle = "#53635b";
+      wrapText(ctx,body[number-1],55,318,475,31);
+      ctx.strokeStyle = "#d8e1d4"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(55,555); ctx.lineTo(545,555); ctx.stroke();
+      ctx.fillStyle = "#146b60"; ctx.font = "12px sans-serif";
+      const captions = ["CLICK THE RIGHT SIDE TO BEGIN", "TIP: ENTER A PAGE NUMBER, THEN PRESS GO", "THE PDF LIBRARY NEEDS AN INTERNET CONNECTION", "LOOK FOR THE THREE LABELED CODE SECTIONS", "ONLY PUBLISH BOOKS YOU HAVE RIGHTS TO SHARE", "OPEN A PDF WHEN YOU ARE READY"];
+      wrapText(ctx,captions[number-1],55,591,475,22);
+      ctx.fillStyle = "#7a857a"; ctx.font = "12px sans-serif"; ctx.fillText("Original demo - not a textbook excerpt",55,762);
+      ctx.textAlign="right"; ctx.fillText(String(number).padStart(2,"0"),545,762);
+      ctx.restore();
+    }
+    async function render() {
+      cancelRenders();
+      const version = renderVersion;
+      const doc = state.pdf;
+      const numbers = visiblePages();
+      updateControls();
+      tell(doc ? "Drawing pages..." : "Opening demo pages...");
+      const newPages = [];
+      try {
+        for (const number of numbers) {
+          const pdfPage = doc ? await doc.getPage(number) : null;
+          if (version !== renderVersion) { pdfPage?.cleanup(); return; }
+          const base = pdfPage ? pdfPage.getViewport({ scale:1 }) : { width:600, height:820 };
+          const availableWidth = Math.max(240,$("stage").clientWidth - (window.innerWidth > 680 ? 44 : 10));
+          const maxWidth = Math.min(650,(availableWidth - 4)/numbers.length);
+          const maxHeight = Math.max(330,Math.min(900,window.innerHeight - 300));
+          const scale = Math.min(maxWidth/base.width,maxHeight/base.height) * state.zoom;
+          const cssWidth = Math.floor(base.width*scale);
+          const cssHeight = Math.floor(base.height*scale);
+          // Bound raster size rather than rendering all 842 pages into memory.
+          const dpr = Math.min(window.devicePixelRatio || 1,2,Math.sqrt(6000000/(cssWidth*cssHeight)));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.floor(cssWidth*dpr); canvas.height = Math.floor(cssHeight*dpr);
+          canvas.style.width = `${cssWidth}px`; canvas.style.height = `${cssHeight}px`;
+          const ctx = canvas.getContext("2d", { alpha:false });
+          if (!ctx) throw new Error("Your browser could not create a drawing canvas.");
+          if (pdfPage) {
+            const viewport = pdfPage.getViewport({ scale });
+            const task = pdfPage.render({ canvas, canvasContext:ctx, viewport, transform:[dpr,0,0,dpr,0,0] });
+            activeTasks.add(task);
+            try { await task.promise; } finally { activeTasks.delete(task); pdfPage.cleanup(); }
+          } else drawDemo(ctx,number,canvas.width,canvas.height);
+          if (version !== renderVersion) return;
+          const paper = document.createElement("button");
+          paper.type = "button"; paper.className="paper";
+          paper.setAttribute("aria-label",`Page ${number}. Use the navigation controls to change pages.`);
+          paper.dataset.page = number;
+          canvas.setAttribute("aria-hidden","true");
+          paper.append(canvas);
+          paper.addEventListener("click",event => {
+            if (numbers.length === 2) turn(number === numbers[0] ? -1 : 1);
+            else {
+              const box = paper.getBoundingClientRect();
+              turn(event.detail === 0 || event.clientX - box.left >= box.width/2 ? 1 : -1);
+            }
+          });
+          newPages.push(paper);
+        }
+        if (version !== renderVersion) return;
+        $("pages").classList.toggle("spread",numbers.length===2);
+        $("pages").replaceChildren(...newPages);
+        if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          $("pages").animate([{opacity:.55},{opacity:1}],{duration:160});
+        }
+        const label = numbers.length===2 ? `Pages ${numbers[0]}-${numbers[1]}` : `Page ${numbers[0]}`;
+        tell(`${label} of ${state.count}${doc ? "" : " - demo book"}.`);
+      } catch (error) {
+        if (version !== renderVersion || error?.name === "RenderingCancelledException") return;
+        console.error(error);
+        tell("This page could not be drawn. Try another page, lower the zoom, or open a smaller PDF.",true);
+      }
+    }
+    async function getPdfEngine() {
+      if (!enginePromise) {
+        enginePromise = (async () => {
+          // Both URLs point to the same version. No PDF contents are sent to these CDNs.
+          for (const host of ["https://cdn.jsdelivr.net/npm/pdfjs-dist@", "https://unpkg.com/pdfjs-dist@"]) {
+            const base = `${host}${PDFJS_VERSION}/`;
+            try {
+              const lib = await import(`${base}build/pdf.mjs`);
+              lib.GlobalWorkerOptions.workerSrc = `${base}build/pdf.worker.mjs`;
+              return { lib, base };
+            } catch (error) { console.warn("Could not load this PDF library source.",error); }
+          }
+          throw new Error("The PDF library could not load. Check your internet connection and use a current browser. A school filter may block the library. Try an HTTP preview or hosted copy rather than file://.");
+        })().catch(error => { enginePromise=null; throw error; });
+      }
+      return enginePromise;
+    }
+    async function openPdf(source) {
+      if (state.busy) return;
+      state.busy=true; cancelRenders(); updateControls();
+      tell("Loading the PDF library and opening your file...");
+      let task;
+      let canceled = false;
+      try {
+        const { lib, base } = await getPdfEngine();
+        const local = source instanceof File;
+        const input = local ? {data:new Uint8Array(await source.arrayBuffer())} : {url:source};
+        task = lib.getDocument({ ...input,
+          cMapUrl:`${base}cmaps/`, cMapPacked:true,
+          standardFontDataUrl:`${base}standard_fonts/`, wasmUrl:`${base}wasm/`,
+          isEvalSupported:false, enableXfa:false
+        });
+        task.onPassword = (updatePassword,reason) => {
+          const password = window.prompt(reason === lib.PasswordResponses.INCORRECT_PASSWORD ? "Incorrect password. Try again:" : "Enter the PDF password:");
+          if (password === null) { canceled=true; task.destroy().catch(()=>{}); }
+          else updatePassword(password);
+        };
+        const pdf = await task.promise;
+        const previous = state.pdf;
+        state.pdf=pdf; state.count=pdf.numPages;
+        state.key=`my-book-reader:${pdf.fingerprints?.[0] || (local ? `${source.name}:${source.size}:${source.lastModified}` : source)}`;
+        state.page=rememberedPage(state.key,state.count); state.zoom=1;
+        $("bookName").textContent=local ? source.name : "Shared PDF";
+        $("sourceTag").textContent=local ? "On your device" : "Shared book";
+        if (previous) previous.destroy().catch(()=>{});
+      } catch (error) {
+        console.error(error);
+        if (task) await task.destroy().catch(()=>{});
+        const message = canceled ? "Opening canceled. Your previous book is still available." :
+          error?.name === "InvalidPDFException" ? "That file is not a readable PDF. Try exporting it as a PDF again." :
+          error?.message?.startsWith("The PDF library") ? error.message :
+          "Could not open this PDF. Check the file, connection, and password. Large scans may need a smaller file or more memory.";
+        tell(message,!canceled);
+        state.busy=false; updateControls(); return;
+      }
+      state.busy=false; updateControls(); render();
+    }
+    function showDemo() {
+      if (state.busy) return;
+      cancelRenders();
+      const previous=state.pdf;
+      Object.assign(state,{pdf:null,count:6,page:1,zoom:1,key:""});
+      $("bookName").textContent="A little guide to your reader";
+      $("sourceTag").textContent="Demo book";
+      if (previous) previous.destroy().catch(()=>{});
+      render();
+    }
+    $("previous").addEventListener("click",()=>turn(-1));
+    $("next").addEventListener("click",()=>turn(1));
+    $("openButton").addEventListener("click",()=>$("pdfFile").click());
+    $("pdfFile").addEventListener("change",event=>{
+      const file=event.target.files[0]; event.target.value="";
+      if (!file) return;
+      if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") { tell("Choose a PDF file, not an image or Word document.",true); return; }
+      openPdf(file);
+    });
+    $("demoButton").addEventListener("click",showDemo);
+    $("jumpForm").addEventListener("submit",event=>{event.preventDefault(); goTo(Number($("pageInput").value));});
+    $("layout").addEventListener("change",()=>{state.layout=$("layout").value; render();});
+    $("zoomIn").addEventListener("click",()=>{state.zoom=Math.min(2,state.zoom+.25); render();});
+    $("zoomOut").addEventListener("click",()=>{state.zoom=Math.max(.75,state.zoom-.25); render();});
+    $("fit").addEventListener("click",()=>{state.zoom=1; render();});
+    document.addEventListener("keydown",event=>{
+      if (event.ctrlKey || event.metaKey || event.altKey || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName) || event.target.isContentEditable) return;
+      if (event.key==="ArrowRight") {event.preventDefault();turn(1);}
+      if (event.key==="ArrowLeft") {event.preventDefault();turn(-1);}
+    });
+    window.addEventListener("resize",()=>{clearTimeout(resizeTimer); resizeTimer=setTimeout(()=>{if(!state.busy)render();},180);});
+    render();
+    if (PUBLIC_PDF_URL.trim()) openPdf(PUBLIC_PDF_URL.trim());
+  </script>
+</body>
+</html>
